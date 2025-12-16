@@ -1,45 +1,31 @@
+mod app;
+mod ui;
+
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyCode},
+    event::{self, Event, KeyCode, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Borders, Row, Table},
-};
-use std::{io, time::Duration};
-use sysinfo::System;
-
-struct App {
-    system: System,
-    running: bool,
-}
-
-impl App {
-    fn new() -> Self {
-        Self {
-            system: System::new_all(),
-            running: true,
-        }
-    }
-
-    fn on_tick(&mut self) {
-        self.system.refresh_all();
-    }
-}
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::{io, time::{Duration, Instant}};
+use crate::app::App;
+use crate::ui::ui;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, event::EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new();
     let tick_rate = Duration::from_millis(1000);
-    let mut last_tick = std::time::Instant::now();
+    let mut last_tick = Instant::now();
+
+    let mut last_input_time = Instant::now();
+    let debounce_rate = Duration::from_millis(50);
 
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
@@ -49,16 +35,39 @@ async fn main() -> Result<()> {
             .unwrap_or_else(|| Duration::from_secs(0));
 
         if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if let KeyCode::Char('q') = key.code {
-                    app.running = false;
+            let event = event::read()?;
+
+            if last_input_time.elapsed() >= debounce_rate {
+                match event {
+                    Event::Key(key) => {
+                        match key.code {
+                            KeyCode::Char('q') => app.running = false,
+                            KeyCode::Down => app.next(),
+                            KeyCode::Up => app.previous(),
+                            KeyCode::Char('k') => app.kill_selected_process(),
+                            KeyCode::Char('s') => app.toggle_sort(),
+                            _ => {}
+                        }
+                        last_input_time = Instant::now();
+                    },
+
+                    Event::Mouse(mouse) => {
+                        match mouse.kind {
+                            MouseEventKind::ScrollDown => app.next(),
+                            MouseEventKind::ScrollUp => app.previous(),
+                            _ => {}
+                        }
+                        last_input_time = Instant::now();
+                    }
+
+                    _ => {}
                 }
             }
         }
 
         if last_tick.elapsed() >= tick_rate {
             app.on_tick();
-            last_tick = std::time::Instant::now();
+            last_tick = Instant::now();
         }
 
         if !app.running {
@@ -67,32 +76,6 @@ async fn main() -> Result<()> {
     }
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen, event::DisableMouseCapture)?;
     Ok(())
-}
-
-fn ui(f: &mut Frame, app: &mut App) {
-    let size = f.size();
-
-    let processes: Vec<Row> = app.system.processes().values().take(20).map(|p| {
-        Row::new(vec![
-            p.pid().to_string(),
-            p.name().to_string(),
-            format!("{:.1}%", p.cpu_usage()),
-            format!("{} MB", p.memory() / 1024 / 1024),
-        ])
-    }).collect();
-
-    let widths = [
-        Constraint::Length(10),
-        Constraint::Percentage(40),
-        Constraint::Percentage(20),
-        Constraint::Percentage(30),
-    ];
-
-    let table = Table::new(processes, widths)
-        .header(Row::new(vec!["PID", "Name", "CPU", "Memory"]).style(Style::default().fg(Color::Yellow)))
-        .block(Block::default().title(" KiloMon - Rust Process Killer ").borders(Borders::ALL));
-
-    f.render_widget(table, size);
 }

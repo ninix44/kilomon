@@ -1,13 +1,25 @@
 # 🦀 KiloMon (Killer Monitor)
 
-**KiloMon** is a lightweight, terminal-based process monitor written in **Rust**.
-It allows users to view system resources in real-time within a TUI (Text User Interface).
+**KiloMon** is a lightweight, high-performance terminal-based process monitor written in **Rust**.
+It allows users to view system resources in real-time, sort processes, and terminate them directly from the TUI (Text User Interface).
+
+> 🚀 **Performance:** Uses `crossterm` and `ratatui` for smooth rendering with minimal resource footprint.
 
 ## ⚡ Features
-- [x] Real-time CPU & Memory usage monitoring.
-- [x] Lightweight TUI using `ratatui` and `crossterm`.
-- [ ] **Killer Mode:** Auto-kill processes based on memory/CPU limits (Coming soon).
-- [ ] Process sorting and filtering.
+- [x] **Real-time Monitoring:** CPU & Memory usage updates every second.
+- [x] **Smart Sorting:** Sort processes by CPU, Memory, PID, or Name (Press `S`).
+- [x] **Killer Mode:** Terminate any process directly from the list (Press `K`).
+- [x] **Interactive UI:** Navigate using Keyboard (Arrow Keys) or **Mouse Scroll**.
+- [x] **Visual Alerts:** High CPU usage (>50%) is highlighted in **Red**.
+
+## 🎮 Controls
+| Key | Action |
+| :--- | :--- |
+| `↑` / `↓` | Navigate through the process list |
+| `Mouse Scroll` | Navigate up/down |
+| `K` | **Kill** the selected process |
+| `S` | Change **Sort** order (CPU / Mem / PID) |
+| `Q` | **Quit** the application |
 
 ## 🚀 How to Run
 
